@@ -29,6 +29,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from requests.adapters import ConnectionError
 from requests.models import InvalidURL
 from transform import *
+from flask import request
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -441,7 +442,7 @@ def get_args():
     parser.add_argument('-u', '--username', help='Username', required=True)
     parser.add_argument('-p', '--password', help='Password', required=False)
     parser.add_argument(
-        '-l', '--location', type=parse_unicode, help='Location', required=True)
+        '-l', '--location', type=parse_unicode, help='Location', required=False)
     parser.add_argument('-st', '--step-limit', help='Steps', required=True)
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument(
@@ -546,11 +547,12 @@ def login(args):
 
     return api_endpoint, access_token, profile_response
 
-def main():
+def main(args):
+    print('STARTING')
     full_path = os.path.realpath(__file__)
     (path, filename) = os.path.split(full_path)
 
-    args = get_args()
+    #args = get_args()
 
     if args.auth_service not in ['ptc', 'google']:
         print '[!] Invalid Auth service specified'
@@ -783,13 +785,39 @@ def config():
     }
     return json.dumps(center)
 
+@app.route('/start')
+def start():
+    if request.args.get('map') == '1':
+        lat = '38.997457'
+        lon = '-84.5958789'
+    elif request.args.get('map') == 'TT':
+        lat = '39.2609900'
+        lon = '-84.4773923'
+    else:
+        lat = request.args.get('lat')
+        lon = request.args.get('lon')
+    args=get_args()
+    args.location = lat + ' ' + lon
+    main(args)
+    register_background_thread(initial_registration=False)
+    return "Hello"
 
 @app.route('/')
 def fullmap():
+    if request.args.get('map') == '1':
+        lat = '38.997457'
+        lon = '-84.5958789'
+    elif request.args.get('map') == 'TT':
+        lat = '39.2609900'
+        lon = '-84.4773923'
+    else:
+        lat = request.args.get('lat')
+        lon = request.args.get('lon')
+    args=get_args()
+    args.location = lat + ' ' + lon
     clear_stale_pokemons()
-
     return render_template(
-        'example_fullmap.html', key=GOOGLEMAPS_KEY, fullmap=get_map(), auto_refresh=auto_refresh)
+            'example_fullmap.html', key=GOOGLEMAPS_KEY, fullmap=get_map(lat, lon), auto_refresh=auto_refresh)
 
 
 @app.route('/next_loc')
@@ -892,18 +920,17 @@ def get_pokemarkers():
     return pokeMarkers
 
 
-def get_map():
+def get_map(org_lat, org_lon):
     fullmap = Map(
         identifier="fullmap2",
         style='height:100%;width:100%;top:0;left:0;position:absolute;z-index:200;',
-        lat=origin_lat,
-        lng=origin_lon,
+        lat=org_lat,
+        lng=org_lon,
         markers=get_pokemarkers(),
         zoom='15', )
     return fullmap
 
 
 if __name__ == '__main__':
-    args = get_args()
-    register_background_thread(initial_registration=True)
-    app.run(debug=True, threaded=True, host=args.host, port=args.port)
+    #args = get_args()
+    app.run(debug=True, threaded=True, host='192.168.1.14', port=8001)
